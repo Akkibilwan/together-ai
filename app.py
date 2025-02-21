@@ -16,13 +16,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# Initialize API keys
 def initialize_api():
     try:
-        # First try to get from Streamlit secrets
         TOGETHER_API_KEY = st.secrets["api_keys"]["together_api"]
     except Exception:
-        # Fallback to environment variables
         TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
         
     if not TOGETHER_API_KEY:
@@ -31,12 +28,9 @@ def initialize_api():
         
     return TOGETHER_API_KEY
 
-# Image processing functions
 def preprocess_image(uploaded_file):
-    """Preprocess the uploaded image"""
     try:
         image = Image.open(uploaded_file)
-        # Ensure image is in RGB mode
         if image.mode != "RGB":
             image = image.convert("RGB")
         return image
@@ -45,13 +39,11 @@ def preprocess_image(uploaded_file):
         return None
 
 def image_to_base64(image):
-    """Convert PIL Image to base64 string"""
     buffered = io.BytesIO()
     image.save(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 def generate_images(api_key, image, prompt, num_images):
-    """Generate image variations using Together AI"""
     try:
         img_base64 = image_to_base64(image)
         
@@ -68,7 +60,9 @@ def generate_images(api_key, image, prompt, num_images):
             "steps": 28,
             "n": num_images,
             "response_format": "b64_json",
-            "input_image": img_base64  # Add the input image if required by the API
+            "image_url": {
+                "url": f"data:image/png;base64,{img_base64}"
+            }
         }
         
         with st.spinner("🎨 Generating variations..."):
@@ -89,19 +83,15 @@ def generate_images(api_key, image, prompt, num_images):
         return None
 
 def main():
-    # Initialize API
     api_key = initialize_api()
     
-    # App header
     st.title("🎨 Together AI - Image Transformation")
     st.write("Transform your images using AI-powered generation")
     
-    # Sidebar controls
     with st.sidebar:
         st.header("Settings")
         num_images = st.slider("Number of Variations", min_value=1, max_value=5, value=1)
         
-    # Main content
     col1, col2 = st.columns([1, 2])
     
     with col1:
