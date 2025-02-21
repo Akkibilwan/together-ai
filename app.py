@@ -68,7 +68,7 @@ def get_video_details(video_id):
 
 # Function to generate AI images with variations
 def generate_images(prompt, model, num_outputs):
-    response = together.Images.generate(
+    response = together.Image.generate(  # ✅ FIXED
         prompt=prompt,
         model=model,
         width=1024,
