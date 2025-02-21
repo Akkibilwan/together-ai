@@ -8,7 +8,7 @@ import io
 # Load Together AI API Key from Streamlit secrets
 TOGETHER_API_KEY = st.secrets["api_keys"]["together_api"]
 
-# Set Together AI API key
+# Set Together AI API Key
 together.api_key = TOGETHER_API_KEY
 
 # Streamlit UI
@@ -52,4 +52,3 @@ if uploaded_image and st.button("Generate Variations"):
 
         except Exception as e:
             st.error(f"Error generating images: {str(e)}")
-
