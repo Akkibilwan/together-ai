@@ -1,58 +1,136 @@
+# requirements.txt content:
+# streamlit==1.32.0
+# together==0.2.5
+# Pillow==10.0.0
+# python-dotenv==1.0.0
+
 import streamlit as st
 import together
 import base64
 from PIL import Image
 import io
+import os
+from dotenv import load_dotenv
 
-# Load API keys from Streamlit secrets
-TOGETHER_API_KEY = st.secrets["api_keys"]["together_api"]
-USER_KEY = st.secrets["api_keys"]["user_key"]
+# Load environment variables
+load_dotenv()
 
-# Set the Together AI API key
-together.api_key = TOGETHER_API_KEY
+# Configure page
+st.set_page_config(
+    page_title="Image Transformation App",
+    page_icon="🎨",
+    layout="wide"
+)
 
-# Streamlit UI
-st.title("🎨 Together AI - Image Transformation")
-
-# Upload an image
-uploaded_image = st.file_uploader("Upload an image (PNG, JPG, JPEG)", type=["png", "jpg", "jpeg"])
-
-# User input fields
-prompt = st.text_area("Enter a prompt for AI transformation", "Make this image look like a futuristic city")
-num_images = st.number_input("Number of Variations (1-5)", min_value=1, max_value=5, value=1)
-
-# Function to generate images using Together AI
-def generate_images(image, prompt, num_images):
+# Initialize API keys
+def initialize_api():
     try:
-        # Convert uploaded image to base64
-        img_buffer = io.BytesIO()
-        image.save(img_buffer, format="PNG")
-        img_base64 = base64.b64encode(img_buffer.getvalue()).decode("utf-8")
+        # First try to get from Streamlit secrets
+        TOGETHER_API_KEY = st.secrets["api_keys"]["together_api"]
+        USER_KEY = st.secrets["api_keys"]["user_key"]
+    except Exception:
+        # Fallback to environment variables
+        TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
+        USER_KEY = os.getenv("USER_KEY")
+        
+    if not TOGETHER_API_KEY:
+        st.error("Together AI API key not found. Please set it in your secrets or environment variables.")
+        st.stop()
+        
+    together.api_key = TOGETHER_API_KEY
+    return USER_KEY
 
-        # Call Together AI API to generate image variations
-        response = together.images.generate(
-            prompt=prompt,
-            model="black-forest-labs/FLUX.1-canny",
-            width=image.width,
-            height=image.height,
-            steps=28,
-            n=num_images,
-            input_image=img_base64,  # Pass the uploaded image in base64 format
-            response_format="b64_json"
-        )
+# Image processing functions
+def preprocess_image(uploaded_file):
+    """Preprocess the uploaded image"""
+    try:
+        image = Image.open(uploaded_file)
+        # Ensure image is in RGB mode
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+        return image
+    except Exception as e:
+        st.error(f"Error processing image: {str(e)}")
+        return None
 
-        # Display generated images
-        st.write("### Generated Variations")
-        for idx, img in enumerate(response["data"]):
-            img_data = base64.b64decode(img["b64_json"])
-            st.image(img_data, caption=f"Variation {idx+1}", use_column_width=True)
+def image_to_base64(image):
+    """Convert PIL Image to base64 string"""
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
+def generate_images(image, prompt, num_images):
+    """Generate image variations using Together AI"""
+    try:
+        img_base64 = image_to_base64(image)
+        
+        with st.spinner("🎨 Generating variations..."):
+            response = together.images.generate(
+                prompt=prompt,
+                model="black-forest-labs/FLUX.1-canny",
+                width=image.width,
+                height=image.height,
+                steps=28,
+                n=num_images,
+                input_image=img_base64,
+                response_format="b64_json"
+            )
+            
+            return response["data"]
     except Exception as e:
         st.error(f"Error generating images: {str(e)}")
+        return None
 
-# Check if image is uploaded and button is clicked
-if uploaded_image and st.button("Generate Variations"):
-    st.write("🖌️ Generating AI images... Please wait!")
-    with st.spinner("Generating images..."):
-        image = Image.open(uploaded_image)  # Open the uploaded image
-        generate_images(image, prompt, num_images)  # Call the function to generate images
+def main():
+    # Initialize API
+    user_key = initialize_api()
+    
+    # App header
+    st.title("🎨 Together AI - Image Transformation")
+    st.write("Transform your images using AI-powered generation")
+    
+    # Sidebar controls
+    with st.sidebar:
+        st.header("Settings")
+        num_images = st.slider("Number of Variations", min_value=1, max_value=5, value=1)
+        
+    # Main content
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        uploaded_image = st.file_uploader(
+            "Upload an image",
+            type=["png", "jpg", "jpeg"],
+            help="Select a PNG or JPEG image to transform"
+        )
+        
+        prompt = st.text_area(
+            "Transformation prompt",
+            "Make this image look like a futuristic city",
+            help="Describe how you want to transform the image"
+        )
+    
+    with col2:
+        if uploaded_image:
+            image = preprocess_image(uploaded_image)
+            if image:
+                st.image(image, caption="Original Image", use_column_width=True)
+                
+                if st.button("Generate Variations", type="primary"):
+                    results = generate_images(image, prompt, num_images)
+                    
+                    if results:
+                        st.write("### Generated Variations")
+                        for idx, img_data in enumerate(results):
+                            try:
+                                img_bytes = base64.b64decode(img_data["b64_json"])
+                                st.image(
+                                    img_bytes,
+                                    caption=f"Variation {idx+1}",
+                                    use_column_width=True
+                                )
+                            except Exception as e:
+                                st.error(f"Error displaying variation {idx+1}: {str(e)}")
+
+if __name__ == "__main__":
+    main()
