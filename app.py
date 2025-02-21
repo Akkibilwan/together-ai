@@ -1,22 +1,22 @@
 import streamlit as st
 import requests
 import base64
+import together
 from googleapiclient.discovery import build
-from together import Together
 
 # Load API keys from Streamlit secrets
 YOUTUBE_API_KEY = st.secrets["api_keys"]["youtube_api"]
 TOGETHER_API_KEY = st.secrets["api_keys"]["together_api"]
 
 # Initialize Together API client
-together_client = Together(api_key=TOGETHER_API_KEY)
+client = together.Together(api_key=TOGETHER_API_KEY)
 
 # Function to fetch YouTube videos based on a keyword
 @st.cache_data(ttl=300)
 def get_youtube_videos(keyword, max_results):
     youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
 
-    # Search for videos related to the keyword
+    # Search for videos
     search_response = youtube.search().list(
         q=keyword, part="snippet", type="video", maxResults=max_results
     ).execute()
@@ -30,18 +30,12 @@ def get_youtube_videos(keyword, max_results):
         channel_title = item["snippet"]["channelTitle"]
 
         # Get video stats
-        video_response = youtube.videos().list(
-            part="statistics", id=video_id
-        ).execute()
-
+        video_response = youtube.videos().list(part="statistics", id=video_id).execute()
         if video_response["items"]:
             views = int(video_response["items"][0]["statistics"].get("viewCount", 0))
 
             # Get channel's average views
-            channel_stats = youtube.channels().list(
-                part="statistics", id=channel_id
-            ).execute()
-
+            channel_stats = youtube.channels().list(part="statistics", id=channel_id).execute()
             if channel_stats["items"]:
                 total_views = int(channel_stats["items"][0]["statistics"]["viewCount"])
                 total_videos = int(channel_stats["items"][0]["statistics"].get("videoCount", 1))
@@ -65,7 +59,7 @@ def get_youtube_videos(keyword, max_results):
 
 # Function to generate an image with Together API
 def generate_image(prompt, model, num_outputs):
-    response = together_client.images.generate(
+    response = client.images.generate(
         prompt=prompt,
         model=model,
         width=1024,
