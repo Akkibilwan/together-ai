@@ -8,8 +8,8 @@ from googleapiclient.discovery import build
 YOUTUBE_API_KEY = st.secrets["api_keys"]["youtube_api"]
 TOGETHER_API_KEY = st.secrets["api_keys"]["together_api"]
 
-# Initialize Together API client
-client = together.Together(api_key=TOGETHER_API_KEY)
+# Set Together API key
+together.api_key = TOGETHER_API_KEY
 
 # Function to fetch YouTube videos based on a keyword
 @st.cache_data(ttl=300)
@@ -59,7 +59,7 @@ def get_youtube_videos(keyword, max_results):
 
 # Function to generate an image with Together API
 def generate_image(prompt, model, num_outputs):
-    response = client.images.generate(
+    response = together.Images.generate(
         prompt=prompt,
         model=model,
         width=1024,
