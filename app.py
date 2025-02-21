@@ -10,8 +10,8 @@ from urllib.parse import urlparse, parse_qs
 YOUTUBE_API_KEY = st.secrets["api_keys"]["youtube_api"]
 TOGETHER_API_KEY = st.secrets["api_keys"]["together_api"]
 
-# Set Together API key
-together.api_key = TOGETHER_API_KEY
+# Initialize Together API client
+client = together.Together(api_key=TOGETHER_API_KEY)
 
 # Function to extract video ID from YouTube URL
 def extract_video_id(url):
@@ -68,7 +68,7 @@ def get_video_details(video_id):
 
 # Function to generate AI images with variations
 def generate_images(prompt, model, num_outputs):
-    response = together.Image.generate(  # ✅ FIXED
+    response = client.images.generate(  # ✅ FIXED
         prompt=prompt,
         model=model,
         width=1024,
