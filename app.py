@@ -1,9 +1,3 @@
-# requirements.txt content:
-# streamlit==1.32.0
-# together==0.2.5
-# Pillow==10.0.0
-# python-dotenv==1.0.0
-
 import streamlit as st
 import together
 import base64
@@ -65,18 +59,21 @@ def generate_images(image, prompt, num_images):
         img_base64 = image_to_base64(image)
         
         with st.spinner("🎨 Generating variations..."):
-            response = together.images.generate(
+            response = together.Complete.create(
                 prompt=prompt,
                 model="black-forest-labs/FLUX.1-canny",
-                width=image.width,
-                height=image.height,
-                steps=28,
-                n=num_images,
-                input_image=img_base64,
-                response_format="b64_json"
+                max_tokens=512,
+                temperature=0.7,
+                image_data={
+                    "data": img_base64,
+                    "width": image.width,
+                    "height": image.height
+                },
+                num_images=num_images,
+                steps=28
             )
             
-            return response["data"]
+            return response.get("images", [])
     except Exception as e:
         st.error(f"Error generating images: {str(e)}")
         return None
@@ -123,7 +120,7 @@ def main():
                         st.write("### Generated Variations")
                         for idx, img_data in enumerate(results):
                             try:
-                                img_bytes = base64.b64decode(img_data["b64_json"])
+                                img_bytes = base64.b64decode(img_data)
                                 st.image(
                                     img_bytes,
                                     caption=f"Variation {idx+1}",
