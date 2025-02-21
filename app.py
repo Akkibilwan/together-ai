@@ -1,10 +1,10 @@
 import streamlit as st
-import together
 import base64
 from PIL import Image
 import io
 import os
 from dotenv import load_dotenv
+import requests
 
 # Load environment variables
 load_dotenv()
@@ -21,18 +21,15 @@ def initialize_api():
     try:
         # First try to get from Streamlit secrets
         TOGETHER_API_KEY = st.secrets["api_keys"]["together_api"]
-        USER_KEY = st.secrets["api_keys"]["user_key"]
     except Exception:
         # Fallback to environment variables
         TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
-        USER_KEY = os.getenv("USER_KEY")
         
     if not TOGETHER_API_KEY:
         st.error("Together AI API key not found. Please set it in your secrets or environment variables.")
         st.stop()
         
-    together.api_key = TOGETHER_API_KEY
-    return USER_KEY
+    return TOGETHER_API_KEY
 
 # Image processing functions
 def preprocess_image(uploaded_file):
@@ -53,34 +50,47 @@ def image_to_base64(image):
     image.save(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-def generate_images(image, prompt, num_images):
+def generate_images(api_key, image, prompt, num_images):
     """Generate image variations using Together AI"""
     try:
         img_base64 = image_to_base64(image)
         
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "model": "black-forest-labs/FLUX.1-canny",
+            "prompt": prompt,
+            "width": image.width,
+            "height": image.height,
+            "steps": 28,
+            "n": num_images,
+            "response_format": "b64_json",
+            "input_image": img_base64  # Add the input image if required by the API
+        }
+        
         with st.spinner("🎨 Generating variations..."):
-            response = together.Complete.create(
-                prompt=prompt,
-                model="black-forest-labs/FLUX.1-canny",
-                max_tokens=512,
-                temperature=0.7,
-                image_data={
-                    "data": img_base64,
-                    "width": image.width,
-                    "height": image.height
-                },
-                num_images=num_images,
-                steps=28
+            response = requests.post(
+                "https://api.together.xyz/v1/images/generations",
+                headers=headers,
+                json=data
             )
             
-            return response.get("images", [])
+            if response.status_code != 200:
+                st.error(f"API Error: {response.status_code} - {response.text}")
+                return None
+                
+            return response.json().get("data", [])
+            
     except Exception as e:
         st.error(f"Error generating images: {str(e)}")
         return None
 
 def main():
     # Initialize API
-    user_key = initialize_api()
+    api_key = initialize_api()
     
     # App header
     st.title("🎨 Together AI - Image Transformation")
@@ -114,13 +124,13 @@ def main():
                 st.image(image, caption="Original Image", use_column_width=True)
                 
                 if st.button("Generate Variations", type="primary"):
-                    results = generate_images(image, prompt, num_images)
+                    results = generate_images(api_key, image, prompt, num_images)
                     
                     if results:
                         st.write("### Generated Variations")
                         for idx, img_data in enumerate(results):
                             try:
-                                img_bytes = base64.b64decode(img_data)
+                                img_bytes = base64.b64decode(img_data["b64_json"])
                                 st.image(
                                     img_bytes,
                                     caption=f"Variation {idx+1}",
